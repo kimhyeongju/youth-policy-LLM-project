@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>청년 정책 추천</title>
+    <link rel="stylesheet" href="/css/fontstyles.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <link rel="stylesheet" type="text/css" href="slick/slick.css"/>
+    <link rel="stylesheet" type="text/css" href="slick/slick-theme.css"/>
+</head>
+<body>
+    <div class="w-full h-screen relative overflow-y-auto">
+		<th:block th:replace="~{fragments/header :: header}"></th:block>    
+        
+        <div class="text-3xl font-bold text-center text-[#7167D3] mb-8">나를 위한 청년 정책 추천</div>
+
+		<div class="flex flex-row justify-between border-b-2 border-b-gray-400 h-auto mx-2 lg:mx-36 xl:mx-60 2xl:mx-96">
+		    <div class="text-left text-lg mb-4" th:text="${user.name}+'님이 혜택 받을 수 있는 정책'">OOO이 혜택 받을 수 있는 정책</div>
+		    <button onclick="location.href='/search'" class="bg-[#7167D3] text-center text-white mb-2 px-4 rounded hover:bg-indigo-600">
+		        전체 정보검색
+		    </button>
+		</div>
+
+		
+		<!-- 추천 정책 -->
+        <div class="multiple-items flex justify-center my-4 mx-2 lg:mx-36 xl:mx-60 2xl:mx-96 relative">
+		    <div th:each="policy : ${policies}" class="border-2 border-gray-300 p-4 rounded w-1/5">
+		        <a class="block text-lg font-bold truncate mb-2 overflow-hidden whitespace-nowrap text-ellipsis" 
+		           th:text="${policy.pName}" 
+		           th:href="'/recs/' + ${policy.policyId}" target="_blank">청년 주택드림 청약통장</a>
+		        <div th:text="${policy.region}" class="text-gray-600 truncate mb-1">국토교통부</div>
+
+		        
+		        <div th:if="${#strings.equals(policy.status, '진행중')}" >
+		        	<span th:text=${policy.eDate} class="text-red-500 truncate mb-4">2024.01.01</span>
+			        <div class="flex justify-between pt-8 items-center">
+			            <div class="bg-green-100 text-green-700 p-2 rounded truncate">진행중</div>
+			            <div th:text="${policy.category}" class="bg-gray-200 text-gray-700 p-2 rounded truncate">주거분야</div>
+			        </div>
+		        </div>
+  		        <div th:if="${#strings.equals(policy.status, '마감')}" >
+		        	<span th:text=${policy.eDate} class="text-red-500 truncate mb-4">2024.01.01</span>
+			        <div class="flex justify-between pt-8 items-center">
+			            <div class="bg-red-100 text-red-700 p-2 rounded truncate">마감</div>
+			            <div th:text="${policy.category}" class="bg-gray-200 text-gray-700 p-2 rounded truncate">주거분야</div>
+			        </div>
+		        </div>
+		        <div th:if="${#strings.equals(policy.status, '상시모집')}" >
+		        	<span th:text=${policy.eDate} class="text-red-500 truncate mb-4">2024.01.01</span>
+			        <div class="flex justify-between pt-8 items-center">
+			            <div class="bg-violet-100 text-gray-700 p-2 rounded truncate">상시</div>
+			            <div th:text="${policy.category}" class="bg-gray-200 text-gray-700 p-2 rounded truncate">주거분야</div>
+			        </div>
+		        </div>
+   		        <div th:if="${#strings.equals(policy.status, '정책 참조')}" >
+		        	<span th:text=${policy.eDate} class="text-red-500 truncate mb-4">2024.01.01</span>
+			        <div class="flex justify-between pt-8 items-center">
+			            <div class="bg-gray-100 text-gray-700 p-2 rounded truncate">정책 참조</div>
+			            <div th:text="${policy.category}" class="bg-gray-200 text-gray-700 p-2 rounded truncate">주거분야</div>
+			        </div>
+		        </div>
+		    </div>
+		</div>
+
+        
+        <!-- 전체 통계 -->
+        <div class="flex flex-row justify-between border-b-2 border-b-gray-400 mt-20 h-auto mx-2 lg:mx-36 xl:mx-60 2xl:mx-96">
+            <div class="text-left text-lg mb-4">전체 통계</div>
+        </div>
+
+        <div class="flex flex-col mt-4 md:flex-row justify-center space-y-4 mb-40 md:space-y-0 md:space-x-4 lg:mx-36 xl:mx-60 2xl:mx-96">
+            <div class="bg-white p-4 rounded-lg shadow-lg w-full md:w-1/2">
+                <!-- Graph area for monthly policy count -->
+                <div id="bargraph" class="w-full h-96"></div>
+            </div>
+    
+            <div class="bg-white p-4 rounded-lg shadow-lg w-full md:w-1/2">
+                <!-- Graph area for category-wise monthly policy count -->
+                <div id="linegraph" class="w-full h-96"></div>
+            </div>
+        </div>
+		
+		<script th:inline="javascript" type="text/javascript">		
+			/*<![CDATA[*/
+			var policyStatistics = /*[[${policyStatistics}]]*/ {};
+			var monthly = /*[[${monthly}]]*/ {};
+			/*]]>*/
+			
+			// 'monthly' 데이터를 사용하여 차트에 필요한 데이터 생성
+			var categories = []; // xAxis에 들어갈 월별 카테고리
+			var seriesData = {}; // 각 분야별로 데이터를 모아둠
+
+			// 각 분야별 색상 설정
+			var colors = {
+			    '교육': '#90CAF9',
+			    '일자리': '#9575CD',
+			    '주거': '#BBDEFB',
+			    '복지 문화': '#D1C4E9',
+			    '참여 권리': '#673AB7'
+			};
+
+			// 데이터 가공
+			monthly.forEach(function(item) {
+			    var month = item['정책시작월'];
+			    var category = item['분야'];
+			    var count = item['count'];
+
+			    if (!categories.includes(month)) {
+			        categories.push(month);
+			    }
+
+			    if (!seriesData[category]) {
+			        seriesData[category] = [];
+			    }
+
+			    // 특정 월에 데이터가 없으면 기본값으로 0을 채워줍니다.
+			    categories.forEach(function(cat) {
+			        if (seriesData[category][categories.indexOf(cat)] === undefined) {
+			            seriesData[category][categories.indexOf(cat)] = 0;
+			        }
+			    });
+
+			    seriesData[category][categories.indexOf(month)] = count;
+			});
+
+			// Highcharts의 series에 맞는 형식으로 데이터 변환
+			var series = Object.keys(seriesData).map(function(category) {
+			    return {
+			        name: category,
+			        data: seriesData[category],
+			        color: colors[category] // 각 분야에 해당하는 색상 적용
+			    };
+			});
+
+    	</script>
+
+        <!-- Include your JavaScript for graphs here -->
+        <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+        <script type="text/javascript" src="/slick/slick.min.js"></script>
+        <script src="/js/linegraph.js"></script>
+        <script src="/js/bargraph.js"></script>
+
+        <script>        
+            $(document).ready(function(){
+                $('.multiple-items').slick({
+                    dots: true,
+                    infinite: true,
+                    speed: 300,
+                    slidesToShow: 4,
+                    slidesToScroll: 1,
+                    responsive: [
+                        {
+                        breakpoint: 1024,
+                        settings: {
+                            slidesToShow: 3,
+                            slidesToScroll: 1,
+                            infinite: true,
+                            dots: true
+                        }
+                        },
+                        {
+                        breakpoint: 600,
+                        settings: {
+                            slidesToShow: 2,
+                            slidesToScroll: 1
+                        }
+                        },
+                        {
+                        breakpoint: 480,
+                        settings: {
+                            slidesToShow: 1,
+                            slidesToScroll: 1
+                        }
+                        }
+                    ]
+                });
+            });
+        </script>
+    </div>
+    </body>
+</html>
